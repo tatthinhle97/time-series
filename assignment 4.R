@@ -5,13 +5,16 @@ library(lubridate)
 library(feasts)
 library(fabletools)
 library(ggplot2)
+library(dplyr)
 
 # 1. Load and prepare data
-data <- read.csv("sample_file_poly.csv", stringsAsFactors = FALSE)
+data <- read.csv("data/sample_file_poly.csv", stringsAsFactors = FALSE)
 data$Date <- mdy(data$Date)  
 
 # 2. Convert to tsibble
-ts_data <- tsibble::as_tsibble(data, index = Date)
+ts_data <- data %>%
+  arrange(Date) %>%
+  tsibble::as_tsibble(index = Date)
 
 # 3. Plot Value vs Date
 ggplot(ts_data, aes(x = Date, y = Value)) +
@@ -19,12 +22,19 @@ ggplot(ts_data, aes(x = Date, y = Value)) +
   labs(title = "Time Series: Value vs Date", x = "Date", y = "Value")
 
 # 4. STL decomposition
-stl_fit <- model(ts_data, STL(Value ~ season(window = 12)))
+stl_fit <- model(
+  ts_data,
+  STL(Value ~ season(period = "1 year") + season(period = "1 week"))
+)
 stl_comp <- components(stl_fit)
 
 # 5. Classical decomposition (corrected)
-classical_fit <- model(ts_data, classical_decomposition(Value ~ season("year"), type = "additive"))
+classical_fit <- model(
+  ts_data, 
+  classical_decomposition(Value ~ season("year"))
+)
 classical_comp <- components(classical_fit)
+autoplot(classical_comp) + ggtitle("Classical Decomposition")
 
 # 6. Plot both decompositions
 autoplot(stl_comp) + ggtitle("STL Decomposition")
@@ -72,4 +82,3 @@ classical_mean <- mean(merged_resid$Classical_Residual, na.rm = TRUE)
 cat("\nResidual Summary:\n")
 cat(sprintf("STL       - Mean: %.4f  SD: %.4f\n", stl_mean, stl_sd))
 cat(sprintf("Classical - Mean: %.4f  SD: %.4f\n", classical_mean, classical_sd))
-
